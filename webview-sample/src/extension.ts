@@ -1,5 +1,6 @@
 import * as path from 'path';
 import * as vscode from 'vscode';
+import * as fs from 'fs';
 
 const cats = {
     'Coding Cat': 'https://media.giphy.com/media/JIX9t2j0ZTN9S/giphy.gif',
@@ -11,6 +12,7 @@ export function activate(context: vscode.ExtensionContext) {
 
     context.subscriptions.push(vscode.commands.registerCommand('catCoding.start', () => {
         CatCodingPanel.createOrShow(context.extensionPath);
+
     }));
 
     context.subscriptions.push(vscode.commands.registerCommand('catCoding.doRefactor', () => {
@@ -60,9 +62,10 @@ class CatCodingPanel {
             enableScripts: true,
 
             // And restrict the webview to only loading content from our extension's `media` directory.
-            localResourceRoots: [
-                vscode.Uri.file(path.join(extensionPath, 'media'))
-            ]
+            // localResourceRoots: [
+            //     // vscode.Uri.file(path.join(extensionPath, 'media')),
+            //     vscode.Uri.file(path.join(extensionPath, 'dist'))
+            // ]
         });
 
         CatCodingPanel.currentPanel = new CatCodingPanel(panel, extensionPath);
@@ -79,7 +82,7 @@ class CatCodingPanel {
         this._panel = panel;
         this._extensionPath = extensionPath;
 
-        // Set the webview's initial html content 
+        // Set the webview's initial html content
         this._update();
 
         // Listen for when the panel is disposed
@@ -97,6 +100,14 @@ class CatCodingPanel {
         this._panel.webview.onDidReceiveMessage(message => {
             switch (message.command) {
                 case 'alert':
+                    vscode.window.showErrorMessage(message.text);
+                    return;
+            }
+        }, null, this._disposables);
+
+        this._panel.webview.onDidReceiveMessage(message => {
+            switch (message.command) {
+                case 'notice':
                     vscode.window.showErrorMessage(message.text);
                     return;
             }
@@ -151,35 +162,42 @@ class CatCodingPanel {
     private _getHtmlForWebview(catGif: string) {
 
         // Local path to main script run in the webview
-        const scriptPathOnDisk = vscode.Uri.file(path.join(this._extensionPath, 'media', 'main.js'));
+        // const scriptPathOnDisk = vscode.Uri.file(path.join(this._extensionPath, 'media', 'main.js'));
 
         // And the uri we use to load this script in the webview
-        const scriptUri = scriptPathOnDisk.with({ scheme: 'vscode-resource' });
+        // const scriptUri = scriptPathOnDisk.with({ scheme: 'vscode-resource' });
+        const reactPathOnDisk = vscode.Uri.file(path.join(vscode.workspace.rootPath, 'dist', 'bundle.js'));
+
+        const reactUri = reactPathOnDisk.with({ scheme: 'vscode-resource' });
+
+        const testPathOnDisk = vscode.Uri.file(path.join(this._extensionPath, 'dist', 'test.js'));
+
+        const testUri = testPathOnDisk.with({ scheme: 'vscode-resource' });
 
         // Use a nonce to whitelist which scripts can be run
         const nonce = getNonce();
 
-        return `<!DOCTYPE html>
-            <html lang="en">
+
+        // console.log(vscode.workspace.rootPath)
+       const testHtml = fs.readFileSync(`${vscode.workspace.rootPath}/index.html`, 'utf8')
+
+
+        return `
+        <!DOCTYPE html>
+        <html>
             <head>
                 <meta charset="UTF-8">
-
-                <!--
-                Use a content security policy to only allow loading images from https or from our extension directory,
-                and only allow scripts that have a specific nonce.
-                -->
-                <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src vscode-resource: https:; script-src 'nonce-${nonce}';">
-
-                <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                <title>Cat Coding</title>
+                <meta name="viewport" content="width=device-width, initial-scale=1">
+                <title>MegaMarket Loyalty Card Tracker</title>
             </head>
             <body>
-                <img src="${catGif}" width="300" />
-                <h1 id="lines-of-code-counter">0</h1>
-
-                <script nonce="${nonce}" src="${scriptUri}"></script>
+                <!-- Hang React App Here -->
+                <div id="contents"></div>
+                <!-- LOAD SCRIPTS -->
+                <script type="text/javascript" src="${reactUri}"></script>
             </body>
-            </html>`;
+        </html>`
+
     }
 }
 
